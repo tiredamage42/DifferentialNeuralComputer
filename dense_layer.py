@@ -18,23 +18,11 @@ class DenseLayer():
             in_shape_g = tf.shape(in_tensor)
             in_shape_l = in_tensor.get_shape().as_list()
             if not self.is_built:
+                self.weights = tf.get_variable('weights', shape=[in_shape_l[-1], self.features], dtype=tf.float32)
                 self.biases = None
-                self.w = tf.get_variable(
-                    'weights', 
-                    shape=[in_shape_l[-1], self.features], 
-                    dtype=tf.float32, 
-                    initializer=None, 
-                    trainable=True
-                )
                 if self.use_bias:
-                    self.biases = tf.get_variable(
-                        'biases', 
-                        shape=[self.features], 
-                        dtype=tf.float32, 
-                        #getting better results with default glorot initializer
-                        initializer=None,#tf.zeros_initializer, 
-                        trainable=True
-                    )
+                    #getting better results with default glorot initializer
+                    self.biases = tf.get_variable('biases', shape=[self.features], dtype=tf.float32)
                 
                 self.is_built = True
 
@@ -45,7 +33,7 @@ class DenseLayer():
                 in_tensor = tf.reshape(in_tensor, [ -1, in_shape_l[-1] ], name="flatten")
                 
             # matrix multiplication
-            out_t = tf.matmul(in_tensor, self.w, name="mx")
+            out_t = tf.matmul(in_tensor, self.weights, name="mx")
 
             # maybe add bias
             if self.biases is not None:
