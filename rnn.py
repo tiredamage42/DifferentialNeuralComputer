@@ -9,15 +9,11 @@ import tensorflow.compat.v1 as tf
 from tensorflow.python.ops.rnn import _transpose_batch_time
 tf.disable_v2_behavior()
 
-def dynamic_rnn(input_data, cell, loop_state_fn=None, initial_loop_state=None):
+def dynamic_rnn(input_data, cell, loop_state_fn, initial_loop_state):
     inputs_shape_g = tf.shape(input_data)
     input_shape_l = input_data.get_shape().as_list()
     
-    print ("\n\ninput shape length > 2 ?")
-    print (len(input_shape_l) > 2)
-    print ("\n\n")
-    
-    pad_input = tf.zeros([inputs_shape_g[0],] + (input_shape_l[2:] if len(input_shape_l) > 2 else []))
+    pad_input = tf.zeros([inputs_shape_g[0],] + input_shape_l[2:])
     
     seq_lengths = inputs_shape_g[1]
 
@@ -34,8 +30,7 @@ def dynamic_rnn(input_data, cell, loop_state_fn=None, initial_loop_state=None):
             return (finished, inputs_ta.read(time), initial_state, previous_output, initial_loop_state)
         else:
             step_input = tf.cond(tf.reduce_all(finished), lambda: pad_input, lambda: inputs_ta.read(time))
-            if loop_state_fn is not None:
-                previous_loop_state = loop_state_fn(time, previous_loop_state, previous_state)
+            previous_loop_state = loop_state_fn(time, previous_loop_state, previous_state)
             return (finished, step_input, previous_state, previous_output, previous_loop_state)
 
     outputs_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell, loop_fn)

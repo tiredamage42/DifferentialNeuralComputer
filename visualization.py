@@ -33,7 +33,7 @@ def assemble_mem_view(final_loop_state, series_list, vocab_size):
     write_weightings = memory_view[1]
     
     #inputs outputs and targets
-    series_list = [tf.one_hot(s, depth=vocab_size) for s in series_list if s is not None]
+    series_list = [tf.one_hot(s, depth=vocab_size) for s in series_list]
     series_imgs_ = []
     for i, s in enumerate(series_list):
         series_imgs_.append( tf.tile(tf.expand_dims(s, -1), [1,1,1,3]) * filters[i%3])
