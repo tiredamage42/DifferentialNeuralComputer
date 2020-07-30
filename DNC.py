@@ -46,7 +46,7 @@ def model_fn (data_in):
     seq_in_one_hot = tf.one_hot(seq_in, depth=vocab_size)
 
     #build the dnc cell
-    cell = DNCCell(StatelessCell("linear", features=32), memory_size=8, word_size=8, num_reads=1, num_writes=1)
+    cell = DNCCell(StatelessCell("linear", features=8), memory_size=8, word_size=8, num_reads=1, num_writes=1)
 
     output, _, final_loop_state = dynamic_rnn(
         seq_in_one_hot, cell, visualization.loop_state_fn, visualization.initial_loop_state()
@@ -57,7 +57,7 @@ def model_fn (data_in):
 
     #return dictionary of tensors to keep track of
     args_dict = {}
-    
+
     with tf.variable_scope('Loss'):
         cross_entorpy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets)
         
@@ -90,17 +90,32 @@ def model_fn (data_in):
 '''TRAINING'''
 
 def plot_mem_view (image, name):
-    plt.imshow(image, interpolation='nearest', cmap='binary')
-    plt.ylabel("Mem(R:Read G:Write)---Usage---Targets---Outputs---Inputs")
-    # Remove ticks
-    # plt.axes().set_xticks([])
-    # plt.axes().set_yticks([])
-    
     if not os.path.exists('images'):
         os.makedirs('images')
     
+    plt.imshow(image, interpolation='nearest', cmap='binary')
+    plt.ylabel("Mem(R:Read G:Write)---Usage---Targets---Outputs---Inputs")
+    # Remove ticks
+    plt.axes().set_xticks([])
+    plt.axes().set_yticks([])
+    
     plt.savefig(os.path.join('images', name) + '.png')
-    plt.close()
+    # plt.close()
+    plt.clf()
+
+def plot_losses(iterations, train_losses, val_losses, name):
+    if not os.path.exists('images'):
+        os.makedirs('images')
+    
+    plt.plot(iterations, train_losses, label='Training')
+    plt.plot(iterations, val_losses, label='Validation')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.legend(loc=4)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join('images', name) + '.png')
+    plt.clf()
     
 def _train_iteration_dummy(session, model_args, data_args, train_ops):
     
@@ -193,6 +208,13 @@ def run_training(batch_size, iterations, inputs_fn, model_fn):
             print ('Running Dummy Train Iteration To Populate Train Loss...')
             model_args = _train_iteration_dummy(sess, model_args, data_args, train_ops)
 
+
+            # keep track of the losses over time
+            # so we can visualze them later
+            iterations_list = []
+            train_losses = []
+            val_losses = []
+
             def validate_and_debug(iteration, model_args):
                 model_args = _one_shot_loop(sess, "Validating", val_ops, model_args, data_args, iteration)
 
@@ -203,16 +225,22 @@ def run_training(batch_size, iterations, inputs_fn, model_fn):
                 log(msg)
 
                 model_args = _one_shot_loop(sess, "Debugging", debug_ops, model_args, data_args, iteration)
+
+
+                iterations_list.append(iteration)
+                train_losses.append(model_args['avg_train_loss'])
+                val_losses.append(model_args['avg_validation_loss'])
                 return model_args
 
 
             #validate at 0 iteration
             model_args = validate_and_debug(0, model_args)
                     
+            
             print ('Starting Training Session...\n')
             for i in range(iterations):
                 
-                do_debugs = (i % 1000 == 0 or i == iterations - 1) and i != 0
+                do_debugs = (i % 100 == 0 or i == iterations - 1) and i != 0
 
                 run_tensors = {
                     '_': tf.get_collection(average_tracking.AVERAGE_TRACK_OPS),
@@ -228,15 +256,17 @@ def run_training(batch_size, iterations, inputs_fn, model_fn):
                     data_args['handle_ph']: train_ops['handle']
                 })
 
-                log("\rTraining Iteration: {0}/{1} :: Loss: {2}".format(i, iterations, run_return['loss']))
+                log("\rTraining Iteration: {0}/{1} :: Loss: {2:.4} ===========".format(i, iterations, run_return['loss']))
 
                 if do_debugs:
                     model_args['avg_train_loss'] = run_return['avg_loss']
                     model_args = validate_and_debug(i, model_args)
             
-        
+            plot_losses(iterations_list, train_losses, val_losses, 'losses')
+
+            
 run_training(
-    batch_size=1, iterations=20000, 
+    batch_size=1, iterations=10000, 
     inputs_fn=inputs_fn, 
     model_fn=model_fn
 )
